@@ -1,0 +1,27 @@
+#!/bin/bash
+
+project_id="<your-project-id>"
+threshold_days=90
+output_file="filtered_keys.txt"
+
+service_accounts=$(gcloud iam service-accounts list --project $project_id --format="value(email)")
+
+for sa in $service_accounts; do
+    echo "Service Account: $sa" >> "$output_file"
+    echo "Keys:" >> "$output_file"
+
+    keys=$(gcloud iam service-accounts keys list --iam-account=$sa --project $project_id --format="value(validAfterTime)")
+
+    while IFS= read -r key; do
+        creation_date=$(date -d "$key" "+%Y-%m-%d")
+        key_date=$(date -d "$creation_date" "+%s")
+        current_date=$(date "+%s")
+        diff_days=$(( ($current_date - $key_date) / (3600 * 24) ))
+
+        if [ $diff_days -gt $threshold_days ]; then
+            echo "  - Creation Date: $creation_date" >> "$output_file"
+        fi
+    done <<< "$keys"
+
+    echo >> "$output_file"
+done
